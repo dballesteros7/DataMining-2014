@@ -3,30 +3,23 @@
 import sys
 
 from sklearn.linear_model.stochastic_gradient import SGDClassifier
+from sklearn.kernel_approximation import RBFSampler
 
 import numpy as np
 
 _LOSS = 'hinge'
 _PENALTY = 'l1'
-_REGULARIZATION=0.00001
+_REGULARIZATION=0.0001
 _KEY = 1
-_M = 5000
-_D = 400
+_GAMMA = 10
+_M = 100
 
-_I = np.identity(_D)
-_ZEROS = np.zeros(_D)
-
-np.random.seed(10009)
-b = np.random.uniform(0, 2*np.pi, _M)
-w = np.random.multivariate_normal(_ZEROS, _I, _M)
 
 # This function has to either stay in this form or implement the
 # feature mapping. For details refer to the handout pdf.
 def transform(x_original):
-    x_new = np.empty(_M)
-    for i in xrange(_M):
-        x_new[i] = np.sqrt(2.0/_M) * np.cos(np.inner(w[i, :], x_original) + b[i])
-    #return np.hstack((x_original, [1]))
+    sampler = RBFSampler(_GAMMA, _M, 10009)
+    x_new = sampler.fit_transform(x_original)
     return x_new
 
 def main():
