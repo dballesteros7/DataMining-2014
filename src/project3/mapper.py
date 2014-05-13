@@ -41,11 +41,11 @@ def main():
     probabilities = np.empty(weights.shape)
     for index in xrange(weights.shape[0]):
         probabilities[index] = weights[index]/weight_sum
-    final_sampling = np.random.choice(original_data.shape[0], size=100, p=probabilities,
+    final_sampling = np.random.choice(original_data.shape[0], size=20, p=probabilities,
                                       replace=False)
-    final_sample = original_data[final_sampling]
-    for sample in final_sample:
-        print "1\t%s" % list(sample)
+    #final_sample = original_data[final_sampling]
+    for index in final_sampling:
+        print "%s\t%s" % (1/(20*weights[index]), list(original_data[index,:]))
     return 0
 if __name__ == "__main__":
     sys.exit(main())
