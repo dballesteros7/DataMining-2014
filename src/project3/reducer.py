@@ -13,7 +13,7 @@ def main():
         weight = float(line.split('\t')[0])
         weights.append(weight)
         data = np.vstack((data, np.fromstring(line.strip().split('\t')[1].strip(']').strip('['), sep=',')))
-    centroids = KMeans(n_components=200).fit(data).cluster_centers_
+    centroids = KMeans(200).fit(data).cluster_centers_
     for centroid in centroids:
         print str(list(centroid)).strip('[').strip(']').replace(',', ' ')
 
