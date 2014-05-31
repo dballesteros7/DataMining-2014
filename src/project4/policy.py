@@ -20,7 +20,6 @@ def set_articles(art):
                                      'w' : np.zeros(USER_FEATURES_DIM),
                                      'updated' : False}
 
-
 # This function will be called by the evaluator.
 # Check task description for details.
 def update(reward):
