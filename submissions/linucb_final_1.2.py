@@ -11,7 +11,7 @@ USER_FEATURES_DIM = 6
 LAST_RECOMMENDATION = None
 LAST_USER = None
 LAST_USER_NORM = None
-ALPHA = 0.1
+ALPHA = 1.2
 
 # Evaluator will call this function and pass the article features.
 # Check evaluator.py description for details.
