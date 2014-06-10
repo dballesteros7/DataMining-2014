@@ -1,0 +1,96 @@
+\documentclass[a4paper, 11pt]{article}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage[pdftex]{hyperref}
+
+\setlength{\textwidth}{16.5cm}
+\setlength{\marginparwidth}{1.5cm}
+\setlength{\parindent}{0cm}
+\setlength{\parskip}{0.15cm}
+\setlength{\textheight}{22cm}
+\setlength{\oddsidemargin}{0cm}
+\setlength{\evensidemargin}{\oddsidemargin}
+\setlength{\topmargin}{0cm}
+\setlength{\headheight}{0cm}
+\setlength{\headsep}{0cm}
+
+\renewcommand{\familydefault}{\sfdefault}
+
+\title{Data Mining: Learning from Large Data Sets - Spring Semester 2014}
+\author{Bojana Dimceva (dbojana@student.ethz.ch)\\
+	    Diego Ballesteros Villamizar (diegob@student.ethz.ch)\\}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Approximate near-duplicate search using Locality Sensitive Hashing} 
+Maximum of 2 pages per section.
+
+\clearpage
+\section{Large-Scale Image Classification}
+\subsection{Algorithm}
+
+For this classification problem, the approach used was parallel stochastic gradient descent as described in the class and in \cite{zinkevich2010parallelized}.
+
+In each of the mappers, a linear SVM was trained using the given subset of data and then the output coefficient vector was passed to the reducer where it was averaged to produce the final linear model for evaluation. This was possible because it was known a priori the number of mappers and there was a single reducer.
+
+The specific details of the implementation of the SVM were left to the SGDClassifier class from the scikit-learn library \cite{scikit-learn} which implements a batch stochastic gradient descent algorithm.
+
+Another approach that was implemented for this task was the use of stochastic sampling in order to approximate kernel SVMs, this was done by transforming the input vectors in each mapper using the RBFSampler class from scikit-learn. This is the method of using random Fourier features to approximate kernels as described in \cite{rahimi2007random}.
+
+\subsection{Parameter tuning}
+For the linear SVM method, the parameters to tune were:
+\begin{itemize}
+	\item The loss function, this could be a hinge or logistic loss which implement a soft-margin SVM or logisitic regression respectively.
+	\item The penalty function, this could be L1 or L2 which determines the sparsity of the solution.
+	\item The regularization parameter, which helps reduce overfitting due to increased model complexity.
+\end{itemize}
+
+For the SVM with random features, two extra parameters were added:
+\begin{itemize}
+	\item The gamma parameter for the RBF sampler which controls the kernel function.
+	\item The number of random features to generate, more features imply a better approximation but it also increases the complexity of the operation.
+\end{itemize}
+
+These parameters were tuned using 10-fold cross validation on the given test data with full grid search on the parameters.
+
+\subsection{Results}
+
+The best score was attained using a linear SVM because any attempt to use the random features with a significant number of features resulted in timeouts in the mappers. However, the attained scored was halfway between the easy and hard baseline. It is possible that some values of the parameters were not explored during the cross validation or rather the approach was too simplistic to solve the problem and instead an approach like PEGASOS should have been tried.
+
+\clearpage
+\section{Extracting Representative Elements From Large Datasets}
+Maximum of 2 pages per section.
+
+\clearpage
+\section{Explore-Exploit Tradeoffs in Recommender Systems}
+
+\subsection{Algorithm}
+For this problem, the algorithm used was linear upper confidence bound (linUCB) as described in the class' lectures and in \cite{li2010contextual}. For this task, only the user features provided at each evaluation step were used, so the algorithm can be classified more accurately as the linUCB with disjoint linear models (Algorithm 1 of  \cite{li2010contextual}).
+
+In summary, the implemented algorithm works as follows:
+
+\begin{enumerate}
+	\item When a recommendation is requested, the Upper Confidence Bound is calculated for each article in the given subset. The UCB is computed using the closed solution for the ridge regression problem, i.e. equation \ref{eq:ucb}, presented in \cite{li2010contextual} where $A_a$ is the inverse of the covariance matrix for article $a$, $b_a$ is the response vector from previous feedback for article $a$ and $x_t$ is the vector of user features for the current recommendation. Finally, the recommended article is the one with maximum calculated UCB.
+	\begin{equation}
+		\label{eq:ucb}
+		UCB = (A^{-1}_{a}b_{a})^{T}x_{t} + \alpha\sqrt{x_{t}^{T}A^{-1}_{a}x_{t}}
+	\end{equation}
+	\item After a recommendation is made and the feedback is received then there are two cases to consider:
+		\begin{itemize}
+			\item If the feedback is -1, then the article recommended was not recommended by the random policy that generated the logs and therefore no information can be retrieved from that log line. The algorithm simply continues to the next recommendation step.
+			\item If the feedback is 0 or +1, then the article recommended matched the one in the log and an update can be made on the covariance matrix and the mean vector for the recommended article, this update is made using the equations given in \cite{li2010contextual}.
+		\end{itemize}
+\end{enumerate}
+
+\subsection{Parameter tuning}
+
+In this algorithm, there is a single parameter that can be used to control the trade-off between exploitation and exploration. From equation \ref{eq:ucb} it can be observed that this value regulates the effect of the estimated covariance in the UCB, large values of $\alpha$ may lead to too much exploration that wastes exploitation opportunities but values to small may fall short of exploring potentially good options. In order to increase the click through rate (CTR) several submissions were made with different values of $\alpha$ using as a reference the results presented in \cite{li2010contextual} for the learning bucket, in the end it was found that the optimal value is 0.2 which is the same value that produces a peak in the results from \cite{li2010contextual}.
+
+The result with the chosen algorithm and parameter value were enough to surpass the hard baseline.
+
+\bibliographystyle{acm}
+\bibliography{report}
+
+\end{document} 
