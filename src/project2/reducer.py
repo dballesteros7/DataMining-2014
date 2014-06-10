@@ -6,7 +6,7 @@ import numpy as np
 _MAPPERS = 10
 
 def main():
-    array_sum = np.zeros(100)
+    array_sum = np.zeros(401)
     for line in sys.stdin:
         line = line.strip()
         _, weights = line.split('\t')
