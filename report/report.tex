@@ -1,6 +1,7 @@
 \documentclass[a4paper, 11pt]{article}
 \usepackage{graphicx}
 \usepackage{amsmath}
+\usepackage{algorithm,algpseudocode}
 \usepackage[pdftex]{hyperref}
 
 \setlength{\textwidth}{16.5cm}
@@ -25,7 +26,21 @@
 \maketitle
 
 \section{Approximate near-duplicate search using Locality Sensitive Hashing} 
-Maximum of 2 pages per section.
+The goal of this task is to detect duplicates from a dataset of videos. Two videos are defined as duplicates if they are at least 85\% percent similar. We work with a dataset of already shingled elements and each video is represented with a collection of integers. 
+
+\subsection{Algorithm}
+To solve this task, we use the Min-Hash algorithm in the mapper, while in the reducer we check the similarity of all pairs of videos that belong in the same bucket and discard the pairs that have similarity less then 85\%.
+ 
+As suggested in class and in \cite{ullman} we simulate permuting the rows for each element to avoid actually permuting them, which is expensive. We draw our hash functions from a locality sensitive family
+
+$$\mathcal{H} : h(x)= \min\limits_{i} h(x_i)$$
+Where $h(x_i)=(a \cdot x_i+b) mod c$. Where we generate $a$ and $b$ randomly, while $c$ is the number of possible elements. We append $k$ such hash functions to get our hash key that will be emitted from the mapper together with the shingles of the hashed video. The shingles are still needed to calculate the similarities in the reducer.
+
+In the reducer we process each bucket by forming all possible pairs of video ids that belong to it. Once we have formed all possible pairs we calculate their similarity and output the pairs that have similarity at least 85\%, while discarding the rest.
+
+\subsection{Parameter Tuning}
+
+We achieved F-Score of 1 by setting the $k$ parameter to 1, i.e. by using only one hash function for the key of each video. This corresponds to doing a 256-way OR of the hash functions.
 
 \clearpage
 \section{Large-Scale Image Classification}
@@ -61,7 +76,73 @@ The best score was attained using a linear SVM because any attempt to use the ra
 
 \clearpage
 \section{Extracting Representative Elements From Large Datasets}
-Maximum of 2 pages per section.
+This task consists of applying a clustering method to a large image dataset and extracting representative elements of each cluster. The task description imposes an implementation for many mappers and one reducer, so every mapper gets as input partition of the data while the reduces gets as input the outputs from all of the mappers.
+
+Our approach for this task has the K-Means algorithm in its core. First we will present the algorithms used in the mapper, i.e. the initialization algorithm for the K-Means algorithm and our implementation of the K-Means algorithm, then we will present the aggregation algorithm used in the reducer. 
+
+\subsection{Mapper:Initialization of centroids}
+
+We initialize the cluster centroids by picking from the existing data points and setting them as centroids. We want the chosen centroids to be as far away from each other as possible as suggested in \cite{ullman}. For this purpose, we pick the first centroid at random, while every consecutive centroid is chosen as the data point whose minimal distance from all the already chosen centroids is maximal. More formally:
+
+$$\mu_m = \max\limits_{i \in [1,N]} \ \   \min\limits_{j \in [1,m-1]} ||\mu_j-x_i||_2^2$$
+
+Where $x_i \in \mathcal{R}^d, i \in [1,N]$ are the data points from the dataset, $N$ is the cardinality of the dataset. A point that satisfies the previous equation has to be found for each centroid $\mu_m, m \in [1,K]$, where $K$ is the number of clusters, which is given for this task. The algorithm follows.
+\begin{algorithm}{}\label{alg:init}
+\caption{Centroid initialization algorithm}
+\begin{algorithmic}[1]
+\Require {$nrst\mu$ Array to keep the distance to the nearest centroid for each point}
+
+\State $\mu_1 = x_{rand\_int(1,N)}$
+\Comment {Pick first centroid randomly}
+
+\For {$m \leftarrow 2,K$}
+        \For {$i \leftarrow 1,N$}
+                \If {$||\mu_{m-1}-x_i||_2^2 < nrst\mu[i]$}
+                        $$nrst\mu[i] = ||\mu_{m-1}-x_i||_2^2$$
+                \EndIf
+                \Comment {Update the minimum distance to centroid for the current point if needed}
+                \If {$new\mu.min\_distance < nrst\mu[i]$}
+                        $$new\mu = x_i$$
+                \EndIf
+                \Comment {The new centroid holds the maximal minimal distance, update if needed}
+        \EndFor
+        \State $\mu_m = new\mu$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+\subsection{Mapper: K-Means Algorithm}
+For the K-Means Algorithm we implemented our own straight forward implementation of the Lloyd's algorithm. The only difference from the standard algorithm is that we use slightly modified convergence criteria. For the algorithm to stop two criteria have to be satisfied: 
+\begin{enumerate}
+\item There is no change in the maximal centroid-point distance, where the point belongs to the cluster of that particular centroid.
+\item The number of iterations is not larger than 1000. 
+\end{enumerate}
+
+The first criteria, stopping when there is no change in the maximal centroid-point distance, is not the same as stopping when the cluster assignments no longer change. The maximal centroid-point distance is not guaranteed to change when the cluster assignments change. However, since we do aggregation in the reducer and we needed to speed up the processing in the mapper, we decided that we can afford to use this convergence criteria - stop earlier than typically and not guarantee reaching local minimum.
+
+After we have learned the centroids, we have to emit the learned configuration for the reducer. It is important to emit the number of points per cluster as well as the coordinates of its centroid. The number of points per cluster will be useful in the reducer.
+
+\subsection{Reducer: Weighted Average of Centroids}
+In the reducer we merge the centroids greedily and apply a weighted averaging algorithm to the sets of merged centroids. As weight we use the information about number of points per cluster. Before we can average sets of merged centroids we have to decide which centroids are going to be merged together. For this we use a greedy approach where we keep a collection of already merged centroids and for each centroid in this collection we find its closest centroid from the current input and merge them together. The pseudo code for the merging is presented as Algorithm~\ref{alg:merge}. 
+\begin{algorithm}{}\label{alg:merge}
+\caption{Centroid merging algorithm}
+\begin{algorithmic}[1]
+\State $merged\mu = parse_input()$
+\Comment {Initialize collection of merged centroids from the first input}
+
+\For {$l \leftarrow 1,L$}
+\Comment {Assuming L mappers}
+\State $current\mu = parse\_input()$
+        \For {$k \leftarrow 1,K$}
+                \State $merge(merged\mu_k, arg\min \limits_{i \in [1,L]}||merged\mu_k-current\mu_i||_2^2)$
+        \EndFor
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+After we have determined which centroids to merge we merge the centroids as suggested in \cite{ullman}, by applying:
+\begin{align*}
+&\mu^* = \frac{\sum\limits_{i=1}^{L} no\_points_i * \mu_i}{\sum\limits_{i=1}^{L} no\_points_i} \\
+\end{align*}
 
 \clearpage
 \section{Explore-Exploit Tradeoffs in Recommender Systems}
